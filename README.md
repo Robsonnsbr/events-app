@@ -177,3 +177,18 @@ make test-frontend
 - `npm run build` no frontend
 - `npm test` no frontend
 - Testes manuais via `curl` nos endpoints do backend
+
+
+<!-- Título -->
+<h3 align="center">Visão Geral do Events App</h3>
+
+<!-- Imagem do events-app -->
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/seu-events-app.png" width="60%" />
+</p>
+
+<!-- Duas imagens lado a lado -->
+<p float="left">
+  <img src="https://github.com/user-attachments/assets/07abe7d4-414d-45f2-a43a-1d7b33bbe6eb" width="45%" />
+  <img src="https://github.com/user-attachments/assets/f5ba5a28-5ff5-47f0-ad82-c762f5fa7961" width="45%" />
+</p>
