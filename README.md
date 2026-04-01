@@ -178,11 +178,7 @@ make test-frontend
 - `npm test` no frontend
 - Testes manuais via `curl` nos endpoints do backend
 
-
-<!-- Título -->
 <h3 align="center">Visão Geral do Events App</h3>
-
-<!-- Imagem do events-app -->
 <p align="center">
   <img src="https://github.com/user-attachments/assets/seu-events-app.png" width="60%" />
 </p>
