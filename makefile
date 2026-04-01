@@ -76,3 +76,16 @@ logs-backend:
 
 logs-frontend:
 	docker compose -p events-app-prod -f docker-compose.prod.yml logs -f frontend
+
+# ========================================
+# Testes
+# ========================================
+test-backend:
+	cd backend && npm test
+
+test-frontend:
+	cd frontend && npm test
+
+test:
+	$(MAKE) test-backend
+	$(MAKE) test-frontend

@@ -45,7 +45,7 @@ O `makefile` tambem valida a existencia de `backend/.env`, entao mantenha esse a
 cp .env.example backend/.env
 ```
 
-Valores usados por padrao:
+Valores usados por padrao env raiz:
 
 ```env
 POSTGRES_USER=postgres
@@ -53,6 +53,12 @@ POSTGRES_PASSWORD=postgres
 POSTGRES_DB=events_db
 DATABASE_URL=postgresql://postgres:postgres@postgres:5432/events_db
 NEXT_PUBLIC_API_URL=http://localhost:3333
+```
+
+Valores usados por padrao env backend:
+
+```env
+DATABASE_URL="postgresql://postgres:postgres@postgres:5432/events_db"
 ```
 
 ## Rodando em desenvolvimento
@@ -126,6 +132,26 @@ Logs do frontend em producao:
 make logs-frontend
 ```
 
+## Testes automatizados
+
+Rodar toda a suite:
+
+```bash
+make test
+```
+
+Rodar apenas backend:
+
+```bash
+make test-backend
+```
+
+Rodar apenas frontend:
+
+```bash
+make test-frontend
+```
+
 ## Endpoints principais
 
 - `GET /events`
@@ -140,6 +166,8 @@ make logs-frontend
 
 - `npm run build` no backend
 - `npm run prisma:validate` no backend
+- `npm test` no backend
 - `npm run lint` no frontend
 - `npm run build` no frontend
+- `npm test` no frontend
 - Testes manuais via `curl` nos endpoints do backend
