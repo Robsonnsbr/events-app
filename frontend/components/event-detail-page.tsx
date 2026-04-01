@@ -20,8 +20,10 @@ export function EventDetailPage() {
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [participantForm, setParticipantForm] = useState(participantFormInitialState);
+  const [participantSearch, setParticipantSearch] = useState("");
   const [selectedParticipantId, setSelectedParticipantId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCreatingParticipant, setIsCreatingParticipant] = useState(false);
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -36,9 +38,42 @@ export function EventDetailPage() {
     return participants.filter((participant) => !subscribedIds.has(participant.id));
   }, [event, participants]);
 
-  const loadPageData = useCallback(async () => {
+  const filteredAvailableParticipants = useMemo(() => {
+    const normalizedSearch = participantSearch.trim().toLowerCase();
+
+    if (!normalizedSearch) {
+      return availableParticipants;
+    }
+
+    return availableParticipants.filter((participant) => {
+      const haystack = `${participant.name} ${participant.email} ${participant.phone}`.toLowerCase();
+      return haystack.includes(normalizedSearch);
+    });
+  }, [availableParticipants, participantSearch]);
+
+  useEffect(() => {
+    if (!feedback && !errorMessage) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setFeedback(null);
+      setErrorMessage(null);
+    }, 4500);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [errorMessage, feedback]);
+
+  const loadPageData = useCallback(async (options?: { showSkeleton?: boolean }) => {
     try {
-      setIsLoading(true);
+      if (options?.showSkeleton) {
+        setIsLoading(true);
+      } else {
+        setIsRefreshing(true);
+      }
+
       setErrorMessage(null);
 
       const [eventResponse, participantsResponse] = await Promise.all([
@@ -59,6 +94,7 @@ export function EventDetailPage() {
       );
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   }, [eventId]);
 
@@ -67,21 +103,23 @@ export function EventDetailPage() {
       return;
     }
 
-    void loadPageData();
+    void loadPageData({ showSkeleton: true });
   }, [eventId, loadPageData]);
 
   useEffect(() => {
-    if (!selectedParticipantId && availableParticipants[0]) {
-      setSelectedParticipantId(availableParticipants[0].id);
+    if (!selectedParticipantId && filteredAvailableParticipants[0]) {
+      setSelectedParticipantId(filteredAvailableParticipants[0].id);
     }
 
     if (
       selectedParticipantId &&
-      availableParticipants.every((participant) => participant.id !== selectedParticipantId)
+      filteredAvailableParticipants.every(
+        (participant) => participant.id !== selectedParticipantId
+      )
     ) {
-      setSelectedParticipantId(availableParticipants[0]?.id ?? "");
+      setSelectedParticipantId(filteredAvailableParticipants[0]?.id ?? "");
     }
-  }, [availableParticipants, selectedParticipantId]);
+  }, [filteredAvailableParticipants, selectedParticipantId]);
 
   async function handleCreateParticipant(eventObject: FormEvent<HTMLFormElement>) {
     eventObject.preventDefault();
@@ -93,8 +131,9 @@ export function EventDetailPage() {
       const response = await api.post<Participant>("/participants", participantForm);
 
       setParticipantForm(participantFormInitialState);
-      setFeedback("Participante criado com sucesso.");
+      setFeedback("Participante criado e selecionado para inscricao.");
       await loadPageData();
+      setParticipantSearch("");
       setSelectedParticipantId(response.data.id);
     } catch (error) {
       setErrorMessage(
@@ -122,7 +161,7 @@ export function EventDetailPage() {
         participantId: selectedParticipantId,
       });
 
-      setFeedback("Participante inscrito com sucesso.");
+      setFeedback("Inscricao concluida com sucesso.");
       await loadPageData();
     } catch (error) {
       setErrorMessage(
@@ -198,16 +237,36 @@ export function EventDetailPage() {
             </div>
           </div>
         </div>
+
+        <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-slate-200 pt-6">
+          <span className="rounded-full bg-white px-4 py-2 text-sm text-slate-600 ring-1 ring-slate-200">
+            Evento #{event.id.slice(0, 8)}
+          </span>
+          <button
+            type="button"
+            onClick={() => void loadPageData()}
+            disabled={isRefreshing}
+            className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isRefreshing ? "Atualizando..." : "Atualizar dados"}
+          </button>
+        </div>
       </section>
 
       {feedback ? (
-        <p className="rounded-[1.5rem] bg-emerald-100 px-5 py-4 text-sm text-emerald-800">
+        <p
+          aria-live="polite"
+          className="rounded-[1.5rem] bg-emerald-100 px-5 py-4 text-sm text-emerald-800"
+        >
           {feedback}
         </p>
       ) : null}
 
       {errorMessage ? (
-        <p className="rounded-[1.5rem] bg-rose-100 px-5 py-4 text-sm text-rose-800">
+        <p
+          aria-live="polite"
+          className="rounded-[1.5rem] bg-rose-100 px-5 py-4 text-sm text-rose-800"
+        >
           {errorMessage}
         </p>
       ) : null}
@@ -307,6 +366,11 @@ export function EventDetailPage() {
               />
             </div>
 
+            <p className="mt-4 text-sm leading-6 text-slate-300">
+              Depois de criar, o participante fica selecionado automaticamente
+              para a inscricao no evento.
+            </p>
+
             <button
               type="submit"
               disabled={isCreatingParticipant}
@@ -332,17 +396,29 @@ export function EventDetailPage() {
 
             <div className="mt-6 space-y-4">
               <label className="block">
+                <span className="mb-2 block text-sm text-slate-600">
+                  Buscar participante disponivel
+                </span>
+                <input
+                  value={participantSearch}
+                  onChange={(eventObject) => setParticipantSearch(eventObject.target.value)}
+                  placeholder="Nome, email ou telefone"
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-950 outline-none transition focus:border-sky-500"
+                />
+              </label>
+
+              <label className="block">
                 <span className="mb-2 block text-sm text-slate-600">Participante</span>
                 <select
                   value={selectedParticipantId}
                   onChange={(eventObject) => setSelectedParticipantId(eventObject.target.value)}
-                  disabled={availableParticipants.length === 0}
+                  disabled={filteredAvailableParticipants.length === 0}
                   className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-950 outline-none transition focus:border-sky-500 disabled:cursor-not-allowed disabled:bg-slate-100"
                 >
-                  {availableParticipants.length === 0 ? (
+                  {filteredAvailableParticipants.length === 0 ? (
                     <option>Nenhum participante disponivel</option>
                   ) : (
-                    availableParticipants.map((participant) => (
+                    filteredAvailableParticipants.map((participant) => (
                       <option key={participant.id} value={participant.id}>
                         {participant.name} - {participant.email}
                       </option>
@@ -350,11 +426,17 @@ export function EventDetailPage() {
                   )}
                 </select>
               </label>
+
+              <p className="text-sm text-slate-500">
+                {filteredAvailableParticipants.length === 0
+                  ? "Todos os participantes disponiveis ja foram inscritos ou nao combinam com a busca."
+                  : `${filteredAvailableParticipants.length} participante(s) pronto(s) para inscricao.`}
+              </p>
             </div>
 
             <button
               type="submit"
-              disabled={isSubscribing || availableParticipants.length === 0}
+              disabled={isSubscribing || filteredAvailableParticipants.length === 0}
               className="mt-6 inline-flex w-full items-center justify-center rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
               {isSubscribing ? "Inscrevendo..." : "Inscrever participante"}

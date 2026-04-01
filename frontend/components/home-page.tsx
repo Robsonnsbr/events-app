@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import {
+  FormEvent,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { api, getApiErrorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { EventSummary } from "@/lib/types";
@@ -15,27 +22,79 @@ const initialForm = {
 export function HomePage() {
   const [events, setEvents] = useState<EventSummary[]>([]);
   const [form, setForm] = useState(initialForm);
-  const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const deferredSearchTerm = useDeferredValue(searchTerm);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const [createdEventId, setCreatedEventId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
 
-  async function loadEvents() {
+  const filteredEvents = useMemo(() => {
+    const normalizedSearch = deferredSearchTerm.trim().toLowerCase();
+
+    if (!normalizedSearch) {
+      return events;
+    }
+
+    return events.filter((event) => {
+      const haystack = `${event.title} ${event.description ?? ""}`.toLowerCase();
+      return haystack.includes(normalizedSearch);
+    });
+  }, [deferredSearchTerm, events]);
+
+  const upcomingEvent = useMemo(() => {
+    const now = Date.now();
+    return events.find((event) => new Date(event.date).getTime() >= now) ?? events[0];
+  }, [events]);
+
+  const currentDateTime = useMemo(() => {
+    const now = new Date();
+    const timezoneOffset = now.getTimezoneOffset() * 60_000;
+    return new Date(now.getTime() - timezoneOffset).toISOString().slice(0, 16);
+  }, []);
+
+  useEffect(() => {
+    if (!feedback && !errorMessage) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setFeedback(null);
+      setErrorMessage(null);
+    }, 4500);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [errorMessage, feedback]);
+
+  async function loadEvents(options?: { initial?: boolean }) {
     try {
-      setIsLoading(true);
+      if (options?.initial) {
+        setIsBootstrapping(true);
+      } else {
+        setIsLoading(true);
+      }
+
       const response = await api.get<EventSummary[]>("/events");
       setEvents(response.data);
+      setHasLoaded(true);
     } catch (error) {
       setErrorMessage(
         getApiErrorMessage(error, "Nao foi possivel carregar os eventos.")
       );
     } finally {
+      setIsBootstrapping(false);
       setIsLoading(false);
     }
   }
 
   useEffect(() => {
-    void loadEvents();
+    void loadEvents({ initial: true });
   }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -45,14 +104,16 @@ export function HomePage() {
     setErrorMessage(null);
 
     try {
-      await api.post("/events", {
+      const response = await api.post<EventSummary>("/events", {
         title: form.title,
         description: form.description,
         date: new Date(form.date).toISOString(),
       });
 
       setForm(initialForm);
-      setFeedback("Evento criado com sucesso.");
+      setSearchTerm("");
+      setCreatedEventId(response.data.id);
+      setFeedback("Evento criado com sucesso. A agenda foi atualizada.");
       await loadEvents();
     } catch (error) {
       setErrorMessage(
@@ -62,6 +123,9 @@ export function HomePage() {
       setIsSubmitting(false);
     }
   }
+
+  const isEmptyState = hasLoaded && !events.length && !isBootstrapping;
+  const noSearchResults = hasLoaded && !!events.length && !filteredEvents.length;
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-10 sm:px-6 lg:px-8">
@@ -80,24 +144,36 @@ export function HomePage() {
           <div className="mt-8 grid gap-4 sm:grid-cols-3">
             <div className="rounded-2xl bg-slate-950 px-5 py-4 text-white">
               <p className="text-sm text-slate-300">Eventos</p>
-              <p className="mt-2 text-3xl font-semibold">{events.length}</p>
+              <p className="mt-2 text-3xl font-semibold">
+                {isBootstrapping ? "..." : events.length}
+              </p>
             </div>
             <div className="rounded-2xl bg-sky-100 px-5 py-4 text-slate-950">
               <p className="text-sm text-slate-600">Proximo evento</p>
               <p className="mt-2 text-lg font-semibold">
-                {events[0] ? formatDate(events[0].date) : "Sem agenda"}
+                {isBootstrapping
+                  ? "Carregando..."
+                  : upcomingEvent
+                    ? formatDate(upcomingEvent.date)
+                    : "Sem agenda"}
               </p>
             </div>
             <div className="rounded-2xl bg-emerald-100 px-5 py-4 text-slate-950">
               <p className="text-sm text-slate-600">Participantes</p>
               <p className="mt-2 text-lg font-semibold">
-                {events.reduce((total, current) => total + current.participantCount, 0)}
+                {isBootstrapping
+                  ? "..."
+                  : events.reduce(
+                      (total, current) => total + current.participantCount,
+                      0
+                    )}
               </p>
             </div>
           </div>
         </div>
 
         <form
+          ref={formRef}
           onSubmit={handleSubmit}
           className="rounded-[2rem] border border-slate-200 bg-slate-950 p-8 text-white shadow-[0_30px_90px_-40px_rgba(2,6,23,0.7)]"
         >
@@ -147,23 +223,33 @@ export function HomePage() {
               <input
                 required
                 type="datetime-local"
+                min={currentDateTime}
                 value={form.date}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, date: event.target.value }))
                 }
                 className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none transition focus:border-sky-400"
               />
+              <span className="mt-2 block text-xs text-slate-400">
+                Escolha uma data futura para manter a agenda consistente.
+              </span>
             </label>
           </div>
 
           {feedback ? (
-            <p className="mt-4 rounded-2xl bg-emerald-400/15 px-4 py-3 text-sm text-emerald-200">
+            <p
+              aria-live="polite"
+              className="mt-4 rounded-2xl bg-emerald-400/15 px-4 py-3 text-sm text-emerald-200"
+            >
               {feedback}
             </p>
           ) : null}
 
           {errorMessage ? (
-            <p className="mt-4 rounded-2xl bg-rose-400/15 px-4 py-3 text-sm text-rose-200">
+            <p
+              aria-live="polite"
+              className="mt-4 rounded-2xl bg-rose-400/15 px-4 py-3 text-sm text-rose-200"
+            >
               {errorMessage}
             </p>
           ) : null}
@@ -193,7 +279,37 @@ export function HomePage() {
           </p>
         </div>
 
-        {isLoading ? (
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <label className="relative block sm:max-w-md sm:flex-1">
+            <span className="sr-only">Buscar eventos</span>
+            <input
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Buscar por nome ou descricao"
+              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-500"
+            />
+          </label>
+
+          <div className="flex items-center gap-3">
+            {isLoading ? (
+              <span className="text-sm text-slate-500">Atualizando lista...</span>
+            ) : (
+              <span className="text-sm text-slate-500">
+                {filteredEvents.length} evento(s) exibido(s)
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => void loadEvents()}
+              disabled={isLoading}
+              className="rounded-full border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Atualizar
+            </button>
+          </div>
+        </div>
+
+        {isBootstrapping ? (
           <div className="mt-8 grid gap-4 md:grid-cols-2">
             {Array.from({ length: 4 }).map((_, index) => (
               <div
@@ -202,17 +318,37 @@ export function HomePage() {
               />
             ))}
           </div>
-        ) : events.length === 0 ? (
+        ) : isEmptyState ? (
           <div className="mt-8 rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center text-slate-500">
-            Nenhum evento cadastrado ainda.
+            <p className="text-base font-medium text-slate-700">
+              Nenhum evento cadastrado ainda.
+            </p>
+            <p className="mt-2 text-sm text-slate-500">
+              Comece criando o primeiro evento no formulario ao lado.
+            </p>
+            <button
+              type="button"
+              onClick={() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              className="mt-5 rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white"
+            >
+              Criar primeiro evento
+            </button>
+          </div>
+        ) : noSearchResults ? (
+          <div className="mt-8 rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center text-slate-500">
+            Nenhum evento corresponde a busca atual.
           </div>
         ) : (
           <div className="mt-8 grid gap-4 md:grid-cols-2">
-            {events.map((event) => (
+            {filteredEvents.map((event) => (
               <Link
                 key={event.id}
                 href={`/events/${event.id}`}
-                className="group rounded-[1.5rem] border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-6 transition hover:-translate-y-1 hover:border-sky-300 hover:shadow-[0_24px_60px_-32px_rgba(14,116,144,0.45)]"
+                className={`group rounded-[1.5rem] border bg-gradient-to-br from-white to-slate-50 p-6 transition hover:-translate-y-1 hover:border-sky-300 hover:shadow-[0_24px_60px_-32px_rgba(14,116,144,0.45)] ${
+                  createdEventId === event.id
+                    ? "border-sky-300 shadow-[0_24px_60px_-32px_rgba(14,116,144,0.45)] ring-2 ring-sky-200"
+                    : "border-slate-200"
+                }`}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div>
@@ -223,9 +359,22 @@ export function HomePage() {
                       {event.title}
                     </h3>
                   </div>
-                  <span className="rounded-full bg-slate-950 px-3 py-1 text-sm text-white">
-                    {event.participantCount} inscritos
-                  </span>
+                  <div className="flex flex-col items-end gap-2">
+                    <span className="rounded-full bg-slate-950 px-3 py-1 text-sm text-white">
+                      {event.participantCount} inscritos
+                    </span>
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] ${
+                        new Date(event.date).getTime() >= Date.now()
+                          ? "bg-emerald-100 text-emerald-800"
+                          : "bg-amber-100 text-amber-800"
+                      }`}
+                    >
+                      {new Date(event.date).getTime() >= Date.now()
+                        ? "Proximo"
+                        : "Encerrado"}
+                    </span>
+                  </div>
                 </div>
 
                 <p className="mt-4 line-clamp-3 min-h-[4.5rem] text-sm leading-6 text-slate-600">
