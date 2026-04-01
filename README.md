@@ -42,7 +42,7 @@ cp .env.example .env
 O `makefile` tambem valida a existencia de `backend/.env`, entao mantenha esse arquivo presente:
 
 ```bash
-cp .env.example backend/.env
+cp backend/.env.example backend/.env
 ```
 
 Valores usados por padrao env raiz:
