@@ -63,6 +63,12 @@ DATABASE_URL="postgresql://postgres:postgres@postgres:5432/events_db"
 
 ## Rodando em desenvolvimento
 
+Aviso: É necessário instalar o make para os próximos comandos.
+
+```bash
+sudo apt install make
+```
+
 Suba o ambiente:
 
 ```bash
