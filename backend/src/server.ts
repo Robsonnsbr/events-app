@@ -1,70 +1,38 @@
-import express, { Request, Response } from "express";
+import cors from "cors";
+import express from "express";
 import { env } from "./lib/env";
+import { errorHandler } from "./lib/error-handler";
 import { prisma } from "./lib/prisma";
+import { eventsRouter } from "./modules/events/events.routes";
+import { participantsRouter } from "./modules/participants/participants.routes";
 
 const app = express();
+app.use(cors());
 app.use(express.json());
 
-// ---------------------
-// GET / => conta participantes
-// ---------------------
-app.get("/", async (req: Request, res: Response) => {
-  try {
-    const participantCount = await prisma.participant.count();
-    res.json(
-      participantCount === 0
-        ? "No participants have been added yet."
-        : `Some participants have been added to the database. Total: ${participantCount}`
-    );
-  } catch (error: unknown) {
-    console.error(error);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
+app.get("/", async (_req, res) => {
+  const [eventCount, participantCount] = await Promise.all([
+    prisma.event.count(),
+    prisma.participant.count(),
+  ]);
+
+  res.json({
+    name: "Events App API",
+    status: "ok",
+    metrics: {
+      events: eventCount,
+      participants: participantCount,
+    },
+  });
 });
 
-// ---------------------
-// POST /events => cria um evento
-// ---------------------
-app.post("/events", async (req: Request, res: Response) => {
-  try {
-    const { title, description, date } = req.body;
-
-    const event = await prisma.event.create({
-      data: {
-        title,
-        description,
-        date: new Date(date),
-      },
-    });
-
-    res.status(201).json(event);
-  } catch (error: unknown) {
-    console.error(error);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
 });
 
-// ---------------------
-// POST /participants => cria participante vinculado a um evento
-// ---------------------
-app.post("/participants", async (req: Request, res: Response) => {
-  try {
-    const { name, email, eventId } = req.body;
-
-    const participant = await prisma.participant.create({
-      data: {
-        name,
-        email,
-        eventId,
-      },
-    });
-
-    res.status(201).json(participant);
-  } catch (error: unknown) {
-    console.error(error);
-    res.status(500).json({ error: "Internal Server Error" });
-  }
-});
+app.use("/events", eventsRouter);
+app.use("/participants", participantsRouter);
+app.use(errorHandler);
 
 const server = app.listen(env.PORT, () => {
   console.log(`Server is running on http://localhost:${env.PORT}`);

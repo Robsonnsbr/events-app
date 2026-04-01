@@ -13,15 +13,27 @@ model Event {
   date        DateTime
   createdAt   DateTime @default(now())
 
-  participants Participant[]
+  registrations EventParticipant[]
 }
 
 model Participant {
   id        String   @id @default(uuid())
   name      String
   email     String   @unique
+  phone     String
   createdAt DateTime @default(now())
 
-  eventId String
-  event   Event @relation(fields: [eventId], references: [id])
+  registrations EventParticipant[]
+}
+
+model EventParticipant {
+  eventId       String
+  participantId String
+  createdAt     DateTime @default(now())
+
+  event       Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  participant Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, participantId])
+  @@index([participantId])
 }
