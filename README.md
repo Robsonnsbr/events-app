@@ -1,6 +1,28 @@
 # Events App
 
-Aplicacao fullstack para gerenciamento de eventos e participantes.
+Aplicação fullstack para gerenciamento de eventos e participantes.
+
+## Clone do Repositório
+
+Clone o projeto para sua máquina:
+
+```bash
+git clone git@github.com:Robsonnsbr/events-app.git
+cd events-app
+```
+
+## Avisos e Pré-requisitos
+
+Antes de qualquer configuração, certifique-se de ter instalado:
+
+- [Docker](https://www.docker.com/get-started)
+- [Docker Compose](https://docs.docker.com/compose/install/)
+- [Make](https://www.gnu.org/software/make/)
+
+```bash
+# No Ubuntu/Debian
+sudo apt install make docker docker-compose
+```
 
 ## Stack
 
@@ -12,9 +34,9 @@ Aplicacao fullstack para gerenciamento de eventos e participantes.
 
 - Cadastro e listagem de eventos
 - Cadastro de participantes com nome, email e telefone
-- Inscricao de participantes em eventos
+- Inscrição de participantes em eventos
 - Detalhe do evento com lista de inscritos
-- Migrations Prisma para evolucao do banco
+- Migrations Prisma para evolução do banco
 
 ## Estrutura
 
@@ -31,7 +53,7 @@ Aplicacao fullstack para gerenciamento de eventos e participantes.
 └── docker-compose.prod.yml
 ```
 
-## Variaveis de ambiente
+## Variáveis de ambiente
 
 Copie `.env.example` para `.env` na raiz:
 
@@ -39,13 +61,13 @@ Copie `.env.example` para `.env` na raiz:
 cp .env.example .env
 ```
 
-O `makefile` tambem valida a existencia de `backend/.env`, entao mantenha esse arquivo presente:
+O `makefile` também valida a existência de `backend/.env`, então mantenha esse arquivo presente:
 
 ```bash
 cp backend/.env.example backend/.env
 ```
 
-Valores usados por padrao env raiz:
+Valores usados por padrão no `.env` raiz:
 
 ```env
 POSTGRES_USER=postgres
@@ -55,7 +77,7 @@ DATABASE_URL=postgresql://postgres:postgres@postgres:5432/events_db
 NEXT_PUBLIC_API_URL=http://localhost:3333
 ```
 
-Valores usados por padrao env backend:
+Valores usados por padrão no `backend/.env`:
 
 ```env
 DATABASE_URL="postgresql://postgres:postgres@postgres:5432/events_db"
@@ -63,19 +85,13 @@ DATABASE_URL="postgresql://postgres:postgres@postgres:5432/events_db"
 
 ## Rodando em desenvolvimento
 
-Aviso: É necessário instalar o make para os próximos comandos.
-
-```bash
-sudo apt install make
-```
-
 Suba o ambiente:
 
 ```bash
 make dev
 ```
 
-Servicos:
+Serviços:
 
 - Frontend: http://localhost:3000
 - Backend: http://localhost:3333
@@ -98,15 +114,15 @@ Para parar:
 make dev-down
 ```
 
-## Rodando em producao local
+## Rodando em produção local
 
-Suba o stack de producao:
+Suba o stack de produção:
 
 ```bash
 make prod
 ```
 
-Para rebuild do ambiente de producao:
+Para rebuild do ambiente de produção:
 
 ```bash
 make prod-rebuild
@@ -126,13 +142,13 @@ make prod-down
 
 ## Logs
 
-Logs do backend em producao:
+Logs do backend em produção:
 
 ```bash
 make logs-backend
 ```
 
-Logs do frontend em producao:
+Logs do frontend em produção:
 
 ```bash
 make logs-frontend
@@ -140,7 +156,7 @@ make logs-frontend
 
 ## Testes automatizados
 
-Rodar toda a suite:
+Rodar toda a suíte:
 
 ```bash
 make test
@@ -168,7 +184,7 @@ make test-frontend
 - `GET /participants`
 - `POST /participants`
 
-## Validacao usada durante a implementacao
+## Validação usada durante a implementação
 
 - `npm run build` no backend
 - `npm run prisma:validate` no backend
@@ -188,3 +204,4 @@ make test-frontend
   <img src="https://github.com/user-attachments/assets/07abe7d4-414d-45f2-a43a-1d7b33bbe6eb" width="45%" />
   <img src="https://github.com/user-attachments/assets/f5ba5a28-5ff5-47f0-ad82-c762f5fa7961" width="45%" />
 </p>
+
