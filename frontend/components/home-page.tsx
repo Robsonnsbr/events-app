@@ -19,6 +19,31 @@ const initialForm = {
   date: "",
 };
 
+function validateEventForm(form: typeof initialForm): string | null {
+  if (!form.title.trim()) {
+    return "O nome do evento e obrigatorio.";
+  }
+
+  if (form.title.trim().length > 200) {
+    return "O nome do evento deve ter no maximo 200 caracteres.";
+  }
+
+  if (form.description && form.description.trim().length > 2000) {
+    return "A descricao deve ter no maximo 2000 caracteres.";
+  }
+
+  if (!form.date) {
+    return "A data e hora do evento sao obrigatorias.";
+  }
+
+  const selectedDate = new Date(form.date);
+  if (selectedDate.getTime() <= Date.now()) {
+    return "A data do evento deve ser no futuro.";
+  }
+
+  return null;
+}
+
 export function HomePage() {
   const [events, setEvents] = useState<EventSummary[]>([]);
   const [form, setForm] = useState(initialForm);
@@ -28,9 +53,11 @@ export function HomePage() {
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [createdEventId, setCreatedEventId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
 
   const filteredEvents = useMemo(() => {
@@ -80,10 +107,12 @@ export function HomePage() {
         setIsLoading(true);
       }
 
+      setLoadFailed(false);
       const response = await api.get<EventSummary[]>("/events");
       setEvents(response.data);
       setHasLoaded(true);
     } catch (error) {
+      setLoadFailed(true);
       setErrorMessage(
         getApiErrorMessage(error, "Nao foi possivel carregar os eventos.")
       );
@@ -99,9 +128,17 @@ export function HomePage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsSubmitting(true);
+    setValidationError(null);
     setFeedback(null);
     setErrorMessage(null);
+
+    const error = validateEventForm(form);
+    if (error) {
+      setValidationError(error);
+      return;
+    }
+
+    setIsSubmitting(true);
 
     try {
       const response = await api.post<EventSummary>("/events", {
@@ -175,6 +212,7 @@ export function HomePage() {
         <form
           ref={formRef}
           onSubmit={handleSubmit}
+          noValidate
           className="rounded-[2rem] border border-slate-200 bg-slate-950 p-8 text-white shadow-[0_30px_90px_-40px_rgba(2,6,23,0.7)]"
         >
           <div className="flex items-center justify-between gap-4">
@@ -193,8 +231,8 @@ export function HomePage() {
             <label className="block">
               <span className="mb-2 block text-sm text-slate-300">Nome</span>
               <input
-                required
                 value={form.title}
+                maxLength={200}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, title: event.target.value }))
                 }
@@ -207,6 +245,7 @@ export function HomePage() {
               <span className="mb-2 block text-sm text-slate-300">Descricao</span>
               <textarea
                 value={form.description}
+                maxLength={2000}
                 onChange={(event) =>
                   setForm((current) => ({
                     ...current,
@@ -221,7 +260,6 @@ export function HomePage() {
             <label className="block">
               <span className="mb-2 block text-sm text-slate-300">Data e hora</span>
               <input
-                required
                 type="datetime-local"
                 min={currentDateTime}
                 value={form.date}
@@ -235,6 +273,15 @@ export function HomePage() {
               </span>
             </label>
           </div>
+
+          {validationError ? (
+            <p
+              aria-live="polite"
+              className="mt-4 rounded-2xl bg-amber-400/15 px-4 py-3 text-sm text-amber-200"
+            >
+              {validationError}
+            </p>
+          ) : null}
 
           {feedback ? (
             <p
@@ -317,6 +364,22 @@ export function HomePage() {
                 className="h-48 animate-pulse rounded-[1.5rem] bg-slate-100"
               />
             ))}
+          </div>
+        ) : loadFailed ? (
+          <div className="mt-8 rounded-[1.5rem] border border-dashed border-rose-300 bg-rose-50 px-6 py-10 text-center">
+            <p className="text-base font-medium text-rose-800">
+              Nao foi possivel carregar os eventos.
+            </p>
+            <p className="mt-2 text-sm text-rose-600">
+              Verifique sua conexao e tente novamente.
+            </p>
+            <button
+              type="button"
+              onClick={() => void loadEvents({ initial: true })}
+              className="mt-5 rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white"
+            >
+              Tentar novamente
+            </button>
           </div>
         ) : isEmptyState ? (
           <div className="mt-8 rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center text-slate-500">

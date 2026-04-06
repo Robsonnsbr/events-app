@@ -13,6 +13,40 @@ const participantFormInitialState = {
   phone: "",
 };
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function validateParticipantForm(form: typeof participantFormInitialState): string | null {
+  if (!form.name.trim()) {
+    return "O nome do participante e obrigatorio.";
+  }
+
+  if (form.name.trim().length > 150) {
+    return "O nome deve ter no maximo 150 caracteres.";
+  }
+
+  if (!form.email.trim()) {
+    return "O email e obrigatorio.";
+  }
+
+  if (!EMAIL_REGEX.test(form.email.trim())) {
+    return "Insira um email valido (ex.: nome@dominio.com).";
+  }
+
+  if (form.email.trim().length > 254) {
+    return "O email deve ter no maximo 254 caracteres.";
+  }
+
+  if (!form.phone.trim()) {
+    return "O telefone e obrigatorio.";
+  }
+
+  if (form.phone.trim().length > 30) {
+    return "O telefone deve ter no maximo 30 caracteres.";
+  }
+
+  return null;
+}
+
 export function EventDetailPage() {
   const params = useParams<{ eventId: string }>();
   const eventId = params.eventId;
@@ -24,10 +58,12 @@ export function EventDetailPage() {
   const [selectedParticipantId, setSelectedParticipantId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [isCreatingParticipant, setIsCreatingParticipant] = useState(false);
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const availableParticipants = useMemo(() => {
     if (!event) {
@@ -75,6 +111,7 @@ export function EventDetailPage() {
       }
 
       setErrorMessage(null);
+      setLoadFailed(false);
 
       const [eventResponse, participantsResponse] = await Promise.all([
         api.get<EventDetail>(`/events/${eventId}`),
@@ -89,6 +126,7 @@ export function EventDetailPage() {
           : participantsResponse.data[0]?.id ?? ""
       );
     } catch (error) {
+      setLoadFailed(true);
       setErrorMessage(
         getApiErrorMessage(error, "Nao foi possivel carregar os detalhes do evento.")
       );
@@ -123,9 +161,17 @@ export function EventDetailPage() {
 
   async function handleCreateParticipant(eventObject: FormEvent<HTMLFormElement>) {
     eventObject.preventDefault();
-    setIsCreatingParticipant(true);
+    setValidationError(null);
     setFeedback(null);
     setErrorMessage(null);
+
+    const error = validateParticipantForm(participantForm);
+    if (error) {
+      setValidationError(error);
+      return;
+    }
+
+    setIsCreatingParticipant(true);
 
     try {
       const response = await api.post<Participant>("/participants", participantForm);
@@ -180,6 +226,33 @@ export function EventDetailPage() {
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="h-80 animate-pulse rounded-[2rem] bg-white/80" />
           <div className="h-80 animate-pulse rounded-[2rem] bg-white/80" />
+        </div>
+      </div>
+    );
+  }
+
+  if (loadFailed && !event) {
+    return (
+      <div className="mx-auto flex min-h-[70vh] w-full max-w-4xl flex-col items-center justify-center gap-4 px-4 text-center">
+        <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Erro</p>
+        <h1 className="text-4xl font-semibold text-slate-950">Falha ao carregar</h1>
+        <p className="max-w-xl text-slate-600">
+          Nao foi possivel carregar os detalhes do evento. Verifique sua conexao e tente novamente.
+        </p>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => void loadPageData({ showSkeleton: true })}
+            className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white"
+          >
+            Tentar novamente
+          </button>
+          <Link
+            href="/"
+            className="rounded-full border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700"
+          >
+            Voltar para a agenda
+          </Link>
         </div>
       </div>
     );
@@ -263,12 +336,19 @@ export function EventDetailPage() {
       ) : null}
 
       {errorMessage ? (
-        <p
+        <div
           aria-live="polite"
-          className="rounded-[1.5rem] bg-rose-100 px-5 py-4 text-sm text-rose-800"
+          className="flex items-center justify-between gap-4 rounded-[1.5rem] bg-rose-100 px-5 py-4"
         >
-          {errorMessage}
-        </p>
+          <p className="text-sm text-rose-800">{errorMessage}</p>
+          <button
+            type="button"
+            onClick={() => void loadPageData()}
+            className="shrink-0 rounded-full border border-rose-300 px-3 py-1 text-xs font-medium text-rose-700 transition hover:bg-rose-200"
+          >
+            Tentar novamente
+          </button>
+        </div>
       ) : null}
 
       <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
@@ -319,6 +399,7 @@ export function EventDetailPage() {
         <div className="space-y-6">
           <form
             onSubmit={handleCreateParticipant}
+            noValidate
             className="rounded-[2rem] border border-slate-200 bg-slate-950 p-8 text-white shadow-[0_24px_70px_-40px_rgba(15,23,42,0.7)]"
           >
             <p className="text-sm uppercase tracking-[0.25em] text-sky-300">
@@ -328,8 +409,8 @@ export function EventDetailPage() {
 
             <div className="mt-6 space-y-4">
               <input
-                required
                 value={participantForm.name}
+                maxLength={150}
                 onChange={(eventObject) =>
                   setParticipantForm((current) => ({
                     ...current,
@@ -340,9 +421,9 @@ export function EventDetailPage() {
                 placeholder="Nome completo"
               />
               <input
-                required
                 type="email"
                 value={participantForm.email}
+                maxLength={254}
                 onChange={(eventObject) =>
                   setParticipantForm((current) => ({
                     ...current,
@@ -353,8 +434,8 @@ export function EventDetailPage() {
                 placeholder="email@dominio.com"
               />
               <input
-                required
                 value={participantForm.phone}
+                maxLength={30}
                 onChange={(eventObject) =>
                   setParticipantForm((current) => ({
                     ...current,
@@ -365,6 +446,15 @@ export function EventDetailPage() {
                 placeholder="Telefone para contato"
               />
             </div>
+
+            {validationError ? (
+              <p
+                aria-live="polite"
+                className="mt-4 rounded-2xl bg-amber-400/15 px-4 py-3 text-sm text-amber-200"
+              >
+                {validationError}
+              </p>
+            ) : null}
 
             <p className="mt-4 text-sm leading-6 text-slate-300">
               Depois de criar, o participante fica selecionado automaticamente
