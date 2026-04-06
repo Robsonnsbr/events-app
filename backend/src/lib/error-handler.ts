@@ -5,6 +5,11 @@ import { AppError } from "./app-error";
 export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
   console.error(error);
 
+  if (error.type === "entity.too.large") {
+    res.status(413).json({ error: "Request payload is too large." });
+    return;
+  }
+
   if (error instanceof AppError) {
     res.status(error.statusCode).json({ error: error.message });
     return;
