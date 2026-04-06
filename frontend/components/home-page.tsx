@@ -112,7 +112,9 @@ export function HomePage() {
       setEvents(response.data);
       setHasLoaded(true);
     } catch (error) {
-      setLoadFailed(true);
+      if (!hasLoaded) {
+        setLoadFailed(true);
+      }
       setErrorMessage(
         getApiErrorMessage(error, "Nao foi possivel carregar os eventos.")
       );

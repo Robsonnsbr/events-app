@@ -29,12 +29,19 @@ A fullstack event management application with participant registration.
 ## Environment Variables
 
 - `DATABASE_URL` — Replit PostgreSQL connection string (auto-provisioned)
-- `NEXT_PUBLIC_API_URL` — Backend API URL (set to Replit dev domain on port 3001)
+- `BACKEND_URL` — Backend API URL for Next.js server-side rewrites (defaults to http://localhost:3001)
 - `PORT` — Backend port (3001)
 
 ## Running Locally
 
-Both services start automatically via Replit workflows. The frontend talks to the backend via `NEXT_PUBLIC_API_URL`.
+Both services start automatically via Replit workflows. The frontend proxies API calls through Next.js rewrites (`/api/*` → backend), so no CORS configuration is needed between frontend and backend.
+
+## Security
+
+- Backend rate limiting: 100 requests/min per IP (express-rate-limit)
+- Request body size limit: 100KB max JSON payload
+- Input validation with max lengths on all string fields
+- Request logging middleware (method, path, status, duration)
 
 ## Database
 

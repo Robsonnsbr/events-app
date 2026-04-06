@@ -8,8 +8,8 @@ channel = "stable-25_05"
 [userenv]
 
 [userenv.shared]
-NEXT_PUBLIC_API_URL = "https://85eb701a-aac4-4733-8992-a272dd998460-00-yoizi6juv6am.worf.replit.dev:3001"
 PORT = "3001"
+BACKEND_URL = "https://85eb701a-aac4-4733-8992-a272dd998460-00-yoizi6juv6am.worf.replit.dev:3001"
 
 [workflows]
 runButton = "Project"
