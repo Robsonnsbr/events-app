@@ -7,7 +7,22 @@ import { participantsRouter } from "./modules/participants/participants.routes";
 
 export const app = express();
 
-app.use(cors());
+const allowedOrigins = [
+  /^https?:\/\/localhost(:\d+)?$/,
+  /\.replit\.dev(:\d+)?$/,
+  /\.repl\.co(:\d+)?$/,
+];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      const allowed = allowedOrigins.some((pattern) => pattern.test(origin));
+      callback(null, allowed);
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
 
 app.get("/", async (_req, res) => {
