@@ -116,4 +116,104 @@ describe("HomePage", () => {
     expect(await screen.findByText("Evento criado com sucesso. A agenda foi atualizada.")).toBeInTheDocument();
     expect(await screen.findByText("Open Source Day")).toBeInTheDocument();
   });
+
+  it("shows error state with retry when initial load fails", async () => {
+    mockGet.mockRejectedValueOnce(new Error("Network error"));
+    mockGetApiErrorMessage.mockReturnValueOnce(
+      "Nao foi possivel carregar os eventos."
+    );
+
+    render(<HomePage />);
+
+    expect(
+      await screen.findByRole("button", { name: "Tentar novamente" })
+    ).toBeInTheDocument();
+
+    mockGet.mockResolvedValueOnce({
+      data: [
+        {
+          id: "event-1",
+          title: "Tech Summit",
+          description: null,
+          date: "2030-01-10T10:00:00.000Z",
+          createdAt: "2030-01-01T09:00:00.000Z",
+          participantCount: 0,
+        },
+      ],
+    });
+
+    fireEvent.click(screen.getByText("Tentar novamente"));
+
+    expect(await screen.findByText("Tech Summit")).toBeInTheDocument();
+  });
+
+  it("shows validation error for empty title", async () => {
+    mockGet.mockResolvedValueOnce({ data: [] });
+
+    render(<HomePage />);
+
+    await screen.findByText("Nenhum evento cadastrado ainda.");
+
+    fireEvent.submit(screen.getByRole("button", { name: "Criar evento" }));
+
+    expect(
+      await screen.findByText("O nome do evento e obrigatorio.")
+    ).toBeInTheDocument();
+    expect(mockPost).not.toHaveBeenCalled();
+  });
+
+  it("shows validation error for past date", async () => {
+    mockGet.mockResolvedValueOnce({ data: [] });
+
+    render(<HomePage />);
+
+    await screen.findByText("Nenhum evento cadastrado ainda.");
+
+    fireEvent.change(screen.getByPlaceholderText("Ex.: Semana de Tecnologia"), {
+      target: { value: "Tech Summit" },
+    });
+
+    const dateInput = document.querySelector(
+      'input[type="datetime-local"]'
+    ) as HTMLInputElement;
+    fireEvent.change(dateInput, {
+      target: { value: "2020-01-01T10:00" },
+    });
+
+    fireEvent.submit(screen.getByRole("button", { name: "Criar evento" }));
+
+    expect(
+      await screen.findByText("A data do evento deve ser no futuro.")
+    ).toBeInTheDocument();
+    expect(mockPost).not.toHaveBeenCalled();
+  });
+
+  it("shows error banner when event creation fails", async () => {
+    mockGet.mockResolvedValueOnce({ data: [] });
+    mockPost.mockRejectedValueOnce(new Error("Server error"));
+    mockGetApiErrorMessage.mockReturnValueOnce(
+      "Nao foi possivel criar o evento."
+    );
+
+    render(<HomePage />);
+
+    await screen.findByText("Nenhum evento cadastrado ainda.");
+
+    fireEvent.change(screen.getByPlaceholderText("Ex.: Semana de Tecnologia"), {
+      target: { value: "Tech Summit" },
+    });
+
+    const dateInput = document.querySelector(
+      'input[type="datetime-local"]'
+    ) as HTMLInputElement;
+    fireEvent.change(dateInput, {
+      target: { value: "2030-01-15T10:00" },
+    });
+
+    fireEvent.submit(screen.getByRole("button", { name: "Criar evento" }));
+
+    expect(
+      await screen.findByText("Nao foi possivel criar o evento.")
+    ).toBeInTheDocument();
+  });
 });

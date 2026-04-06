@@ -10,6 +10,11 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
     return;
   }
 
+  if (error.type === "entity.parse.failed") {
+    res.status(400).json({ error: "Invalid JSON in request body." });
+    return;
+  }
+
   if (error instanceof AppError) {
     res.status(error.statusCode).json({ error: error.message });
     return;

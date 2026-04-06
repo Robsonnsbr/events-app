@@ -95,4 +95,143 @@ describe("EventDetailPage", () => {
     expect(await screen.findByText("Inscricao concluida com sucesso.")).toBeInTheDocument();
     expect(await screen.findByText("Ana Souza")).toBeInTheDocument();
   });
+
+  it("shows error state with retry when initial load fails", async () => {
+    mockGet.mockRejectedValueOnce(new Error("Network error"));
+    mockGet.mockRejectedValueOnce(new Error("Network error"));
+    mockGetApiErrorMessage.mockReturnValueOnce(
+      "Nao foi possivel carregar os detalhes do evento."
+    );
+
+    render(<EventDetailPage />);
+
+    expect(
+      await screen.findByText("Falha ao carregar")
+    ).toBeInTheDocument();
+    expect(screen.getByText("Tentar novamente")).toBeInTheDocument();
+    expect(screen.getByText("Voltar para a agenda")).toBeInTheDocument();
+
+    const eventPayload = {
+      id: "event-1",
+      title: "Tech Summit",
+      description: "Evento de tecnologia",
+      date: "2030-01-10T10:00:00.000Z",
+      createdAt: "2030-01-01T09:00:00.000Z",
+      participantCount: 0,
+      participants: [],
+    };
+
+    mockGet
+      .mockResolvedValueOnce({ data: eventPayload })
+      .mockResolvedValueOnce({ data: [] });
+
+    fireEvent.click(screen.getByText("Tentar novamente"));
+
+    expect(await screen.findByText("Tech Summit")).toBeInTheDocument();
+  });
+
+  it("shows validation error for invalid email in participant form", async () => {
+    const eventPayload = {
+      id: "event-1",
+      title: "Tech Summit",
+      description: null,
+      date: "2030-01-10T10:00:00.000Z",
+      createdAt: "2030-01-01T09:00:00.000Z",
+      participantCount: 0,
+      participants: [],
+    };
+
+    mockGet
+      .mockResolvedValueOnce({ data: eventPayload })
+      .mockResolvedValueOnce({ data: [] });
+
+    render(<EventDetailPage />);
+
+    await screen.findByText("Tech Summit");
+
+    fireEvent.change(screen.getByPlaceholderText("Nome completo"), {
+      target: { value: "Ana" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("email@dominio.com"), {
+      target: { value: "invalid-email" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("Telefone para contato"), {
+      target: { value: "123456" },
+    });
+
+    fireEvent.submit(screen.getByRole("button", { name: "Criar participante" }));
+
+    expect(
+      await screen.findByText("Insira um email valido (ex.: nome@dominio.com).")
+    ).toBeInTheDocument();
+    expect(mockPost).not.toHaveBeenCalled();
+  });
+
+  it("shows validation error for missing participant name", async () => {
+    const eventPayload = {
+      id: "event-1",
+      title: "Tech Summit",
+      description: null,
+      date: "2030-01-10T10:00:00.000Z",
+      createdAt: "2030-01-01T09:00:00.000Z",
+      participantCount: 0,
+      participants: [],
+    };
+
+    mockGet
+      .mockResolvedValueOnce({ data: eventPayload })
+      .mockResolvedValueOnce({ data: [] });
+
+    render(<EventDetailPage />);
+
+    await screen.findByText("Tech Summit");
+
+    fireEvent.submit(screen.getByRole("button", { name: "Criar participante" }));
+
+    expect(
+      await screen.findByText("O nome do participante e obrigatorio.")
+    ).toBeInTheDocument();
+    expect(mockPost).not.toHaveBeenCalled();
+  });
+
+  it("shows error banner when subscription fails", async () => {
+    const eventPayload = {
+      id: "event-1",
+      title: "Tech Summit",
+      description: null,
+      date: "2030-01-10T10:00:00.000Z",
+      createdAt: "2030-01-01T09:00:00.000Z",
+      participantCount: 0,
+      participants: [],
+    };
+
+    const participantPayload = [
+      {
+        id: "participant-1",
+        name: "Ana",
+        email: "ana@example.com",
+        phone: "123",
+        createdAt: "2030-01-01T09:00:00.000Z",
+      },
+    ];
+
+    mockGet
+      .mockResolvedValueOnce({ data: eventPayload })
+      .mockResolvedValueOnce({ data: participantPayload });
+
+    mockPost.mockRejectedValueOnce(new Error("Server error"));
+    mockGetApiErrorMessage.mockReturnValueOnce(
+      "Nao foi possivel concluir a inscricao."
+    );
+
+    render(<EventDetailPage />);
+
+    await screen.findByText("Tech Summit");
+
+    fireEvent.submit(screen.getByRole("button", { name: "Inscrever participante" }));
+
+    expect(
+      await screen.findByText("Nao foi possivel concluir a inscricao.")
+    ).toBeInTheDocument();
+  });
 });
