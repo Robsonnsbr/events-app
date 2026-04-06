@@ -1,11 +1,15 @@
 import cors from "cors";
 import express from "express";
+import rateLimit from "express-rate-limit";
 import { errorHandler } from "./lib/error-handler";
+import { requestLogger } from "./lib/request-logger";
 import { prisma } from "./lib/prisma";
 import { eventsRouter } from "./modules/events/events.routes";
 import { participantsRouter } from "./modules/participants/participants.routes";
 
 export const app = express();
+
+app.set("trust proxy", 1);
 
 const allowedOrigins = [
   /^https?:\/\/localhost(:\d+)?$/,
@@ -23,7 +27,20 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json());
+
+app.use(requestLogger);
+
+const limiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 100,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again later." },
+});
+
+app.use(limiter);
+
+app.use(express.json({ limit: "100kb" }));
 
 app.get("/", async (_req, res) => {
   const [eventCount, participantCount] = await Promise.all([

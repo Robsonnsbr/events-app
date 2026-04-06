@@ -1,5 +1,18 @@
 import { AppError } from "./app-error";
 
+const MAX_LENGTHS: Record<string, number> = {
+  title: 200,
+  name: 150,
+  email: 254,
+  phone: 30,
+  description: 2000,
+  participantId: 36,
+};
+
+function maxLengthFor(fieldName: string): number {
+  return MAX_LENGTHS[fieldName] ?? 500;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -27,6 +40,11 @@ export function getRequiredString(
     throw new AppError(`${fieldName} is required.`, 400);
   }
 
+  const max = maxLengthFor(fieldName);
+  if (normalizedValue.length > max) {
+    throw new AppError(`${fieldName} must be at most ${max} characters.`, 400);
+  }
+
   return normalizedValue;
 }
 
@@ -40,7 +58,17 @@ export function getOptionalString(value: unknown, fieldName: string): string | n
   }
 
   const normalizedValue = value.trim();
-  return normalizedValue.length > 0 ? normalizedValue : null;
+
+  if (normalizedValue.length === 0) {
+    return null;
+  }
+
+  const max = maxLengthFor(fieldName);
+  if (normalizedValue.length > max) {
+    throw new AppError(`${fieldName} must be at most ${max} characters.`, 400);
+  }
+
+  return normalizedValue;
 }
 
 export function getRequiredDate(value: unknown, fieldName: string): Date {
